@@ -4,42 +4,32 @@ var Strategy = require('passport-local').Strategy;
 var db = require('./db');
 
 
+var OICStrategy = require('passport-openid-connect').Strategy
+var User = require('passport-openid-connect').User
+
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
+
+var oic = new OICStrategy({
+  "issuerHost": "aauiamapp.dk",
+  "client_id": "@!C5A9.5DE6.4387.4EA4!0001!6906.7631!0008!B441.37B3",
+  "client_secret": "prSc1tGVRg7B",
+  "redirect_uri": "http://127.0.0.1:3000/callbackstefan",
+  "scope": "openid user_name email"
+});
+
+
+passport.use(oic)
+
+passport.serializeUser(OICStrategy.serializeUser)
+passport.deserializeUser(OICStrategy.deserializeUser)
+
+
+
 // Configure the local strategy for use by Passport.
 //
 // The local strategy require a `verify` function which receives the credentials
 // (`username` and `password`) submitted by the user.  The function must verify
 // that the password is correct and then invoke `cb` with a user object, which
-// will be set at `req.user` in route handlers after authentication.
-passport.use(new Strategy(
-  function(username, password, cb) {
-    db.users.findByUsername(username, function(err, user) {
-      if (err) { return cb(err); }
-      if (!user) { return cb(null, false); }
-      if (user.password != password) { return cb(null, false); }
-      return cb(null, user);
-    });
-  }));
-
-
-// Configure Passport authenticated session persistence.
-//
-// In order to restore authentication state across HTTP requests, Passport needs
-// to serialize users into and deserialize users out of the session.  The
-// typical implementation of this is as simple as supplying the user ID when
-// serializing, and querying the user record by ID from the database when
-// deserializing.
-passport.serializeUser(function(user, cb) {
-  cb(null, user.id);
-});
-
-passport.deserializeUser(function(id, cb) {
-  db.users.findById(id, function (err, user) {
-    if (err) { return cb(err); }
-    cb(null, user);
-  });
-});
-
-
 
 
 // Create a new Express application.
@@ -61,33 +51,15 @@ app.use(require('express-session')({ secret: 'keyboard cat', resave: false, save
 app.use(passport.initialize());
 app.use(passport.session());
 
+app.get('/loginStefan', passport.authenticate('passport-openid-connect', {"successReturnToOrRedirect": "/"}))
+app.get('/callbackStefan', passport.authenticate('passport-openid-connect', {"callback": true, "successReturnToOrRedirect": "/sucess"}))
+
+
 // Define routes.
 app.get('/',
   function(req, res) {
     res.render('home', { user: req.user });
   });
 
-app.get('/login',
-  function(req, res){
-    res.render('login');
-  });
-  
-app.post('/login', 
-  passport.authenticate('local', { failureRedirect: '/login' }),
-  function(req, res) {
-    res.redirect('/');
-  });
-  
-app.get('/logout',
-  function(req, res){
-    req.logout();
-    res.redirect('/');
-  });
-
-app.get('/profile',
-  require('connect-ensure-login').ensureLoggedIn(),
-  function(req, res){
-    res.render('profile', { user: req.user });
-  });
 
 app.listen(3000);
